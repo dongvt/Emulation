@@ -32,7 +32,7 @@ async function main() {
 
     //Check keys
   };
-  setInterval(completeCycle, 1000);
+  setInterval(completeCycle, 16);
 }
 
 main();

@@ -93,7 +93,7 @@ export default class chip8 {
 
   runOpcode() {
     let VIdx, XIdx, YIdx;
-    console.log(this.opcode.toString(16),this.V,this.stack.map(n => n.toString(16)))
+    //console.log(this.opcode.toString(16),this.V,this.stack.map(n => n.toString(16)))
     switch (this.opcode & 0xf000) {
       case 0x0000:
         switch (this.opcode & 0x00ff) {
@@ -241,14 +241,14 @@ export default class chip8 {
         for(let yLine = 0 ; yLine < height; yLine++) {
             const pixel = this.memory[this.I + yLine];
             for(let xLine = 0; xLine < 8; xLine++) {
-                if((pixel & (0x80 >> xLine)) === 1) {
-                    if(this.screen[XIdx + xLine + (YIdx + yLine) * 64] !== 0)
+                if((pixel & (0x80 >> xLine)) !== 0) {
+                    if(this.screen[this.V[XIdx] + xLine + (this.V[YIdx] + yLine) * 64] !== 0)
                         this.V[0xF] = 1;
-                    this.screen[XIdx + xLine + (YIdx + yLine) * 64] ^= 1;
+                    this.screen[this.V[XIdx] + xLine + (this.V[YIdx] + yLine) * 64] ^= 1;
                 }
             }
         }
-        console.log(`Drawing in ${this.V[XIdx]},${this.V[YIdx]}`);
+        //console.log(`Drawing in ${this.V[XIdx]},${this.V[YIdx]}`);
         this.drawFlag = true;
         this.PC += 2;
         break;

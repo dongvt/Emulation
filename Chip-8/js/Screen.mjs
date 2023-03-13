@@ -36,7 +36,7 @@ export default class Screen {
     for(let i = 0 ; i < this.state.length; i++) {
         if(this.state[i]) {
             const x = (i % cols);
-            const y = ~~(i / rows);
+            const y = ~~(i / cols);
             ctx.fillRect(x * gap, y * gap, gap, gap);
         }
     }
