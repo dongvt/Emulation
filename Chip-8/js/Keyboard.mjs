@@ -42,7 +42,7 @@ export default class Keyboard {
 
     getPressedKey() {
         for(let i = 0x0 ; i < this.pressedKeys.length; i++) {
-            if(this.pressedKeys) return i;
+            if(this.pressedKeys[i]) return i;
         }
         return -0x1;
     }

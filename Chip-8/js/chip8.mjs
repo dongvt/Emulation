@@ -71,7 +71,7 @@ export default class chip8 {
     for(let i = 0;i < uInt8Arr.length; i++) {
         this.memory[i + 0x200] = uInt8Arr[i];
     }
-    console.log(this.memory);
+    //console.log(this.memory);
   }
 
   emulateCycle() {
@@ -93,7 +93,7 @@ export default class chip8 {
 
   runOpcode() {
     let VIdx, XIdx, YIdx;
-    //console.log(this.opcode.toString(16),this.V,this.stack.map(n => n.toString(16)))
+    //console.log(this.opcode.toString(16),this.stack)
     switch (this.opcode & 0xf000) {
       case 0x0000:
         switch (this.opcode & 0x00ff) {
@@ -115,7 +115,7 @@ export default class chip8 {
         this.PC = this.opcode & 0x0fff;
         break;
       case 0x2000:
-        this.stack[this.SP++] = this.PC;
+        this.stack[this.SP++] = this.PC + 2;
         this.PC = this.opcode & 0x0fff;
         break;
       case 0x3000:
@@ -280,6 +280,7 @@ export default class chip8 {
             break;
           case 0x000a:
             const key = this.keyboard.getPressedKey();
+            console.log(key,'*****************')
             if (key !== -1) {
               VIdx = (this.opcode & 0x0f00) >> 8;
               this.V[VIdx] = key;
@@ -299,6 +300,8 @@ export default class chip8 {
           case 0x001e:
             VIdx = (this.opcode & 0x0f00) >> 8;
             this.I += this.V[VIdx];
+            //Overflow
+            //this.I = this.I & 0xfff;
             this.PC += 2;
             break;
           case 0x0029:
