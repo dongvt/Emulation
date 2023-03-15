@@ -79,7 +79,7 @@ export default class chip8 {
     this.opcode = (this.memory[this.PC] << 8) | this.memory[this.PC + 1];
     //Decode and execute opcode
     this.runOpcode();
-
+    
     //Update timers
     if (this.delay_timer > 0) this.delay_timer--;
     if (this.sound_timer > 0) {
@@ -93,7 +93,7 @@ export default class chip8 {
 
   runOpcode() {
     let VIdx, XIdx, YIdx;
-    //console.log(this.opcode.toString(16),this.stack)
+
     switch (this.opcode & 0xf000) {
       case 0x0000:
         switch (this.opcode & 0x00ff) {

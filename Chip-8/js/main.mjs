@@ -15,12 +15,13 @@ async function main() {
   screen.setUpScreen(800, 800);
 
   //Load ROM
-  const ROM = await fetch("./roms/pumpkindressup.ch8").then((response) =>
-    response.arrayBuffer()
+  const ROM = await fetch("./roms/Tetris [Fran Dachille, 1991].ch8").then(
+    (response) => response.arrayBuffer()
   );
   newChip8.loadMemory(new Uint8Array(ROM));
 
-  const completeCycle = () => {
+  //const completeCycle = () => {
+  while (true) {
     //Emulate cycle
     newChip8.emulateCycle();
 
@@ -29,10 +30,11 @@ async function main() {
       newChip8.drawFlag = false;
       screen.draw();
     }
-
-    //Check keys
-  };
-  setInterval(completeCycle, 16);
+    await new Promise((resolve) => setTimeout(resolve,1))
+  }
+  //Check keys
+  //};
+  //setInterval(completeCycle, 16);
 }
 
 main();
