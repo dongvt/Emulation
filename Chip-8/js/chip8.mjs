@@ -93,7 +93,7 @@ export default class chip8 {
 
   runOpcode() {
     let VIdx, XIdx, YIdx;
-    console.log(this.opcode.toString(16),this.V)
+    //console.log(this.opcode.toString(16),this.V)
     switch (this.opcode & 0xf000) {
       case 0x0000:
         switch (this.opcode & 0x00ff) {
