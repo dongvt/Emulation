@@ -7,21 +7,21 @@ export default class Keyboard {
 
     setUpKeyboard() {
         this.keyMap = new Map([
-            ['digit1',0x0],
-            ['digit2',0x1],
-            ['digit3',0x2],
-            ['digit4',0x3],
+            ['digit1',0x1],
+            ['digit2',0x2],
+            ['digit3',0x3],
+            ['digit4',0xc],
             ['keyq',0x4],
             ['keyw',0x5],
             ['keye',0x6],
-            ['keyr',0x7],
-            ['keya',0x8],
-            ['keys',0x9],
-            ['keyd',0xa],
-            ['keyf',0xb],
-            ['keyz',0xc],
-            ['keyx',0xd],
-            ['keyc',0xe],
+            ['keyr',0xd],
+            ['keya',0x7],
+            ['keys',0x8],
+            ['keyd',0x9],
+            ['keyf',0xe],
+            ['keyz',0xa],
+            ['keyx',0x0],
+            ['keyc',0xb],
             ['keyv',0xf],
         ]);
 

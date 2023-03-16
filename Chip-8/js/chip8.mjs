@@ -249,7 +249,7 @@ export default class chip8 {
                 }
             }
         }
-        //console.log(`Drawing in ${this.V[XIdx]},${this.V[YIdx]}`);
+        
         this.drawFlag = true;
         this.PC += 2;
         break;
