@@ -306,7 +306,9 @@ export default class chip8 {
             break;
           case 0x0029:
             //Read from the output?
-            console.log(`Dude need to modify 'I' here ${this.opcode}`)
+            VIdx = (this.opcode & 0x0f00) >> 8;
+            this.I = (this.V[VIdx] & 0x000f) * 5;
+            this.PC += 2;
             break;
           case 0x0033:
             VIdx = (this.opcode & 0x0f00) >> 8;

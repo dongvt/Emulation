@@ -20,8 +20,9 @@ async function main() {
   );
   newChip8.loadMemory(new Uint8Array(ROM));
 
-  //const completeCycle = () => {
+  let count = -1;
   while (true) {
+    if(count++ % 60 === 0) console.log(Math.floor(Date.now()/1000))
     //Emulate cycle
     newChip8.emulateCycle();
 
@@ -30,11 +31,9 @@ async function main() {
       newChip8.drawFlag = false;
       screen.draw();
     }
-    await new Promise((resolve) => setTimeout(resolve,1))
+    await new Promise((resolve) => setTimeout(resolve,16))
   }
-  //Check keys
-  //};
-  //setInterval(completeCycle, 16);
+
 }
 
 main();
