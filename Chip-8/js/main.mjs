@@ -15,14 +15,12 @@ async function main() {
   screen.setUpScreen(800, 800);
 
   //Load ROM
-  const ROM = await fetch("./roms/Tetris [Fran Dachille, 1991].ch8").then(
+  const ROM = await fetch("./roms/br8kout.ch8").then(
     (response) => response.arrayBuffer()
   );
   newChip8.loadMemory(new Uint8Array(ROM));
 
-  let count = -1;
   while (true) {
-    if(count++ % 60 === 0) console.log(Math.floor(Date.now()/1000))
     //Emulate cycle
     newChip8.emulateCycle();
 

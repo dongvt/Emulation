@@ -93,7 +93,7 @@ export default class chip8 {
 
   runOpcode() {
     let VIdx, XIdx, YIdx;
-
+    console.log(this.opcode.toString(16),this.V)
     switch (this.opcode & 0xf000) {
       case 0x0000:
         switch (this.opcode & 0x00ff) {
@@ -183,9 +183,9 @@ export default class chip8 {
           case 0x0005:
             XIdx = (this.opcode & 0x0f00) >> 8;
             YIdx = (this.opcode & 0x00f0) >> 4;
+            this.V[XIdx] = (this.V[XIdx] - this.V[YIdx]) & 0x00ff;
             if (this.V[YIdx] > this.V[XIdx]) this.V[0xf] = 0;
             else this.V[0xf] = 1;
-            this.V[XIdx] = (this.V[XIdx] - this.V[YIdx]) & 0x00ff;
             this.PC += 2;
             break;
           case 0x0006:
@@ -197,9 +197,10 @@ export default class chip8 {
           case 0x0007:
             XIdx = (this.opcode & 0x0f00) >> 8;
             YIdx = (this.opcode & 0x00f0) >> 4;
+            
+            this.V[XIdx] = (this.V[YIdx] - this.V[XIdx]) & 0x00ff;
             if (this.V[YIdx] < this.V[XIdx]) this.V[0xf] = 0;
             else this.V[0xf] = 1;
-            this.V[XIdx] = (this.V[YIdx] - this.V[XIdx]) & 0x00ff;
             this.PC += 2;
             break;
           case 0x000e:
