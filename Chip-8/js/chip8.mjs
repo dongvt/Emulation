@@ -175,9 +175,9 @@ export default class chip8 {
           case 0x0004:
             XIdx = (this.opcode & 0x0f00) >> 8;
             YIdx = (this.opcode & 0x00f0) >> 4;
+            this.V[XIdx] = (this.V[XIdx] + this.V[YIdx]) & 0x00ff;
             if (this.V[YIdx] > 0xff - this.V[XIdx]) this.V[0xf] = 1;
             else this.V[0xf] = 0;
-            this.V[XIdx] = (this.V[XIdx] + this.V[YIdx]) & 0x00ff;
             this.PC += 2;
             break;
           case 0x0005:
@@ -197,7 +197,6 @@ export default class chip8 {
           case 0x0007:
             XIdx = (this.opcode & 0x0f00) >> 8;
             YIdx = (this.opcode & 0x00f0) >> 4;
-            
             this.V[XIdx] = (this.V[YIdx] - this.V[XIdx]) & 0x00ff;
             if (this.V[YIdx] < this.V[XIdx]) this.V[0xf] = 0;
             else this.V[0xf] = 1;
@@ -205,8 +204,9 @@ export default class chip8 {
             break;
           case 0x000e:
             VIdx = (this.opcode & 0x0f00) >> 8;
-            this.V[0xf] = this.V[VIdx] & 0x80; //Get most significant bit
+            
             this.V[VIdx] = (this.V[VIdx] << 1) & 0xff;
+            this.V[0xf] = (this.V[VIdx] & 0x80) !== 0 ? 1 : 0; //Get most significant bit
             this.PC += 2;
             break;
           default:
@@ -229,7 +229,7 @@ export default class chip8 {
         break;
       case 0xc000:
         VIdx = (this.opcode & 0x0f00) >> 8;
-        this.V[VIdx] = ~~(Math.random() * 256) & this.opcode & 0x00ff;
+        this.V[VIdx] = ~~(Math.random() * 256) & (this.opcode & 0x00ff);
         this.PC += 2;
         break;
       case 0xd000:
@@ -239,17 +239,22 @@ export default class chip8 {
         //Draw screen
         this.V[0xF] = 0;
 
-        for(let yLine = 0 ; yLine < height; yLine++) {
-            const pixel = this.memory[this.I + yLine];
-            for(let xLine = 0; xLine < 8; xLine++) {
-                if((pixel & (0x80 >> xLine)) !== 0) {
-                    if(this.screen[this.V[XIdx] + xLine + (this.V[YIdx] + yLine) * 64] !== 0)
-                        this.V[0xF] = 1;
-                    this.screen[this.V[XIdx] + xLine + (this.V[YIdx] + yLine) * 64] ^= 1;
-                }
-            }
-        }
         
+        const rowSize = 64;
+        const colSize = 32;
+        const x = this.V[XIdx];
+        const y = this.V[YIdx];
+        for(var a = 0; a < height; a++) {
+					for(var b = 0; b < 8; b++) {
+						var target = ((x+b) % rowSize) + ((y+a) % colSize)*rowSize;
+						var source = ((this.memory[this.I+a] >> (7-b)) & 0x1) != 0;
+						
+						if (!source) { continue; }
+						if (this.screen[target]) { this.screen[target] = 0; this.V[0xF] = 0x1; }
+						else { this.screen[target] = 1; }
+					}
+				}
+
         this.drawFlag = true;
         this.PC += 2;
         break;
@@ -281,7 +286,6 @@ export default class chip8 {
             break;
           case 0x000a:
             const key = this.keyboard.getPressedKey();
-            console.log(key,'*****************')
             if (key !== -1) {
               VIdx = (this.opcode & 0x0f00) >> 8;
               this.V[VIdx] = key;
@@ -302,11 +306,10 @@ export default class chip8 {
             VIdx = (this.opcode & 0x0f00) >> 8;
             this.I += this.V[VIdx];
             //Overflow
-            //this.I = this.I & 0xfff;
+            this.I = this.I & 0xfff;
             this.PC += 2;
             break;
           case 0x0029:
-            //Read from the output?
             VIdx = (this.opcode & 0x0f00) >> 8;
             this.I = (this.V[VIdx] & 0x000f) * 5;
             this.PC += 2;

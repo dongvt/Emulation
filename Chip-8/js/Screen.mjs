@@ -8,29 +8,25 @@ export default class Screen {
     this.state = state;
   }
 
-  async setUpScreen(h, w) {
-    this.canvas.height = h;
-    this.canvas.width = w;
-    this.WIDTH = w;
-    this.HEIGHT = h;
+  async setUpScreen(h, w) {    
 
-    // //Testing
-    // const ctx = this.context;
-    // for(let i = 0; i < 64 ; i++) {
-    //     if(i % 2 === 0) ctx.fillStyle = 'blue';
-    //     else ctx.fillStyle = 'red';
-    //     this.draw(5, i);
-    //     await new Promise(resolve => setTimeout(resolve, 1000));
-    // }
+    this.cols = 64;
+    this.rows = 32;
+    this.gap = ~~(w / this.cols);  
+
+    this.WIDTH = this.cols * this.gap;
+    this.HEIGHT = this.rows * this.gap;
+
+    this.canvas.height = this.HEIGHT;
+    this.canvas.width = this.WIDTH;
+    
   }
 
   draw() {
 
     const ctx = this.context;
-    //console.log(this.state)
-    const cols = 64;
-    const rows = 32;
-    const gap = ~~(this.WIDTH / cols);  
+    const gap = this.gap;
+    const cols = this.cols;
 
     this.clear();
     for(let i = 0 ; i < this.state.length; i++) {

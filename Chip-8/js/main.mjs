@@ -29,7 +29,7 @@ async function main() {
       newChip8.drawFlag = false;
       screen.draw();
     }
-    await new Promise((resolve) => setTimeout(resolve,16))
+    await new Promise((resolve) => setTimeout(resolve,1))
   }
 
 }
