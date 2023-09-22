@@ -2,7 +2,7 @@
 import { AddressMode as AM, Registers as R } from "./Modes";
 import Instructions from './Instructions';
 
-class CPU {
+export default class CPU {
   private instructionHandler : Instructions;
   public memory: Memory;
   public registers: Uint16Array;
@@ -30,7 +30,7 @@ class CPU {
 
   constructor() {
     this.registers = new Uint16Array(8);
-    //this.instructionHandler = new Instructions();
+    this.instructionHandler = new Instructions();
 
     this.reset();
   }
@@ -96,7 +96,7 @@ class CPU {
       }
 
       //execute
-      instruction.run(); //TODO: Add the address so we know what to run
+      instruction.run(this); //TODO: Add the address so we know what to run
     }
 
     this.remainingCycles--;

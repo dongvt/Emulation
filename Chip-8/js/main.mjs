@@ -2,7 +2,7 @@ import chip8 from "./chip8.mjs";
 import Keyboard from "./keyboard.mjs";
 import Screen from "./screen.mjs";
 
-async function main() {
+
   //Input
   const keyboard = new Keyboard();
   keyboard.setUpKeyboard();
@@ -15,12 +15,12 @@ async function main() {
   screen.setUpScreen(800, 800);
 
   //Load ROM
-  const ROM = await fetch("./roms/br8kout.ch8").then(
+  const ROM = await fetch("./roms/Tetris [Fran Dachille, 1991].ch8").then(
     (response) => response.arrayBuffer()
   );
   newChip8.loadMemory(new Uint8Array(ROM));
 
-  while (true) {
+  function main() {
     //Emulate cycle
     newChip8.emulateCycle();
 
@@ -29,9 +29,6 @@ async function main() {
       newChip8.drawFlag = false;
       screen.draw();
     }
-    await new Promise((resolve) => setTimeout(resolve,1))
   }
+  setInterval(main,1);
 
-}
-
-main();
