@@ -26,11 +26,11 @@ class CPU {
   private pc = 0x00;
   private status = 0x00;
 
-  private lookup : Opcode;
+  private lookup: Opcode;
 
   constructor() {
     this.lookup = new Opcode(this);
-  } 
+  }
 
   private getFlag() {}
 
@@ -49,7 +49,7 @@ class CPU {
   }
 
   public clock(): void {
-    if(this.cycles === 0) {
+    if (this.cycles === 0) {
       this.opcode = this.read(this.pc);
       this.pc++;
 
@@ -60,7 +60,6 @@ class CPU {
       const additionalCycle2 = this.lookup[this.opcode].operation();
 
       this.cycles += additionalCycle1 + additionalCycle2;
-
     }
 
     this.cycles--;
@@ -69,7 +68,9 @@ class CPU {
   public irq(): void {} //interrupt request signal
   public nmi(): void {} //non maskable interrupt
 
-  public fetch(): number {}
+  public fetch(): number {
+    
+  }
 
   //Addressing modes (12)
   public IMP(): number {
@@ -77,22 +78,127 @@ class CPU {
     return 0;
   }
 
-  public ZP0(): number {
-    
-  }
-  public ZPY(): number {}
-  public ABS(): number {}
-  public ABY(): number {}
-  public IZX(): number {}
   public IMM(): number {
     this.address_abs = this.pc++;
     return 0;
   }
-  public ZPX(): number {}
-  public REL(): number {}
-  public ABX(): number {}
-  public IND(): number {}
-  public IZY(): number {}
+
+  public ZP0(): number {
+    this.address_abs = this.read(this.pc++);
+    this.address_abs &= 0x0ff;
+    return 0;
+  }
+
+  public ZPY(): number {
+    this.address_abs = this.read(this.pc) + this.y;
+    this.pc++;
+    this.address_abs &= 0x0ff;
+    return 0;
+  }
+
+  public ZPX(): number {
+    this.address_abs = this.read(this.pc) + this.x;
+    this.pc++;
+    this.address_abs &= 0x0ff;
+    return 0;
+  }
+
+  public ABS(): number {
+    const low = this.read(this.pc);
+    this.pc++;
+    const high = this.read(this.pc);
+    this.pc++;
+
+    this.address_abs = (high << 8) | low;
+
+    return 0;
+  }
+
+  public ABX(): number {
+    const low = this.read(this.pc);
+    this.pc++;
+    const high = this.read(this.pc);
+    this.pc++;
+
+    this.address_abs = (high << 8) | low;
+    this.address_abs += this.x;
+
+    if ((this.address_abs & 0xff00) !== high << 8) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  public ABY(): number {
+    const low = this.read(this.pc);
+    this.pc++;
+    const high = this.read(this.pc);
+    this.pc++;
+
+    this.address_abs = (high << 8) | low;
+    this.address_abs += this.y;
+
+    if ((this.address_abs & 0xff00) !== high << 8) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  public IND(): number {
+    const low = this.read(this.pc);
+    this.pc++;
+    const high = this.read(this.pc);
+    this.pc++;
+
+    const completeAddr = (high << 8) | low;
+
+    if (low == 0x00ff) {
+      this.address_abs =
+        (this.read(completeAddr & 0x00ff) << 8) | this.read(completeAddr + 0);
+    } else {
+      this.address_abs =
+        (this.read(completeAddr + 1) << 8) | this.read(completeAddr + 0);
+    }
+
+    return 0;
+  }
+
+  public IZX(): number {
+    const t = this.read(this.pc);
+    const low = this.read((t + this.x) & 0x00ff);
+    const high = this.read((t + this.x + 1) & 0x00ff);
+
+    this.address_abs = (high << 8) | low;
+
+    return 0;
+  }
+
+  public IZY(): number {
+    const t = this.read(this.pc);
+    this.pc++;
+    const low = this.read(t & 0x00ff);
+    const high = this.read((t + 1) & 0x00ff);
+
+    this.address_abs = (high << 8) | low;
+    this.address_abs += this.y;
+
+    if ((this.address_abs & 0x00ff) !== high << 8) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  public REL(): number {
+    this.address_rel = this.read(this.pc);
+    this.pc++;
+    if(this.address_rel & 0x80)
+      this.address_rel |= 0xFF00;
+
+      return 0;
+  }
 
   //opcodes (52)
   public ADC(): number {}
