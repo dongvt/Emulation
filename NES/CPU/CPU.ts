@@ -32,9 +32,17 @@ class CPU {
     this.lookup = new Opcode(this);
   }
 
-  private getFlag() {}
+  private getFlag(f : number) : number {
+    return (this.status & 0xf) > 0 ? 1 : 0;
+  }
 
-  private setFlag() {}
+  private setFlag(f : Flags, value : boolean) {
+    if(value) {
+      this.status |= f;
+    } else {
+      this.status &= ~f;
+    }
+  }
 
   public ConnectBus(n: Bus) {
     this.bus = n;
@@ -69,7 +77,10 @@ class CPU {
   public nmi(): void {} //non maskable interrupt
 
   public fetch(): number {
-    
+    if(this.lookup[this.opcode].addrmode !== this.IMP) {
+      this.fetched = this.read(this.address_abs);
+    }
+    return this.fetched;
   }
 
   //Addressing modes (12)
@@ -202,7 +213,19 @@ class CPU {
 
   //opcodes (52)
   public ADC(): number {}
-  public BCS(): number {}
+  public BCS(): number {
+    if(this.getFlag(Flags.C) === 1) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
   public BNE(): number {}
   public BVS(): number {}
   public CLV(): number {}
@@ -215,7 +238,13 @@ class CPU {
   public SEC(): number {}
   public STX(): number {}
   public TSX(): number {}
-  public AND(): number {}
+  public AND(): number {
+    this.fetch();
+    this.a = this.a & this.fetched;
+    this.setFlag(Flags.Z, this.a == 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
+    return 1;
+  }
   public BEQ(): number {}
   public BPL(): number {}
   public CLC(): number {}
