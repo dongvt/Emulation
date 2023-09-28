@@ -220,15 +220,39 @@ class CPU {
       if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
         this.cycles++;
       }
-
       this.pc = this.address_abs;
     }
 
     return 0;
   }
-  public BNE(): number {}
-  public BVS(): number {}
-  public CLV(): number {}
+  public BNE(): number {
+    if(this.getFlag(Flags.Z) === 0) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public BVS(): number {
+    if(this.getFlag(Flags.V) === 1) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public CLV(): number {
+    this.setFlag(Flags.V,false);
+    return 0;
+  }
   public DEC(): number {}
   public INC(): number {}
   public JSR(): number {}
@@ -245,9 +269,34 @@ class CPU {
     this.setFlag(Flags.N,(this.a & 0x80) !== 0);
     return 1;
   }
-  public BEQ(): number {}
-  public BPL(): number {}
-  public CLC(): number {}
+  public BEQ(): number {
+    if(this.getFlag(Flags.Z) === 1) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public BPL(): number {
+    if(this.getFlag(Flags.N) === 0) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public CLC(): number {
+    this.setFlag(Flags.C,false);
+    return 0;
+  }
   public CMP(): number {}
   public DEX(): number {}
   public INX(): number {}
@@ -261,7 +310,10 @@ class CPU {
   public ASL(): number {}
   public BIT(): number {}
   public BRK(): number {}
-  public CLD(): number {}
+  public CLD(): number {
+    this.setFlag(Flags.D,false);
+    return 0;
+  }
   public CPX(): number {}
   public DEY(): number {}
   public INY(): number {}
@@ -272,10 +324,46 @@ class CPU {
   public SEI(): number {}
   public TAX(): number {}
   public TXS(): number {}
-  public BCC(): number {}
-  public BMI(): number {}
-  public BVC(): number {}
-  public CLI(): number {}
+  public BCC(): number {
+    if(this.getFlag(Flags.C) === 0) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public BMI(): number {
+    if(this.getFlag(Flags.N) === 1) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public BVC(): number {
+    if(this.getFlag(Flags.V) === 0) {
+      this.cycles++;
+      this.address_abs = this.pc + this.address_rel;
+      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
+        this.cycles++;
+      }
+      this.pc = this.address_abs;
+    }
+
+    return 0;
+  }
+  public CLI(): number {
+    this.setFlag(Flags.I,false);
+    return 0;
+  }
   public CPY(): number {}
   public EOR(): number {}
   public JMP(): number {}
