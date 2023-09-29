@@ -72,8 +72,27 @@ class CPU {
 
     this.cycles--;
   }
-  public reset(): void {}
-  public irq(): void {} //interrupt request signal
+  public reset(): void {
+    this.a = 0;
+    this.x = 0;
+    this.y = 0;
+    this.sp = 0xFD;
+    this.status = 0x00 | Flags.U;
+
+    this.address_abs = 0xFFFC;
+    const low = this.read(this.address_abs + 0);
+    const high = this.read(this.address_abs + 1);
+
+    this.pc = (high << 8) | low;
+    this.address_rel = 0x0000;
+    this.address_abs = 0x0000;
+    this.fetched = 0x00;
+
+    this.cycles = 8;
+  }
+  public irq(): void { //interrupt request signal
+    
+  } 
   public nmi(): void {} //non maskable interrupt
 
   public fetch(): number {
@@ -212,7 +231,17 @@ class CPU {
   }
 
   //opcodes (52)
-  public ADC(): number {}
+  public ADC(): number {
+    this.fetch();
+    const temp = this.a + this.fetched + this.getFlag(Flags.C);
+    this.setFlag(Flags.C,temp > 255);
+    this.setFlag(Flags.Z,(temp & 0x00FF) === 0);
+    this.setFlag(Flags.N, (temp & 0x80) !== 0);
+    this.setFlag(Flags.V,((~(this.a ^ this.fetched) & (this.a ^ temp)) & 0x0080) !== 0);
+    this.a = temp & 0x00FF;
+
+    return 1;
+  }
   public BCS(): number {
     if(this.getFlag(Flags.C) === 1) {
       this.cycles++;
@@ -302,7 +331,13 @@ class CPU {
   public INX(): number {}
   public LDA(): number {}
   public NOP(): number {}
-  public PLA(): number {}
+  public PLA(): number {
+    this.sp++;
+    this.a = this.read(0x0100 + this.sp);
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
+    return 0;
+  }
   public RTI(): number {}
   public SED(): number {}
   public STY(): number {}
@@ -368,9 +403,24 @@ class CPU {
   public EOR(): number {}
   public JMP(): number {}
   public LDY(): number {}
-  public PHA(): number {}
+  public PHA(): number {
+    this.write(0x0100 + this.sp,this.a);
+    this.sp--;
+    return 0;
+  }
   public ROL(): number {}
-  public SBC(): number {}
+  public SBC(): number {
+    this.fetch();
+    const value = this.fetched ^ 0x00FF;
+    const temp = this.a + value + this.getFlag(Flags.C);
+    this.setFlag(Flags.C,(temp & 0xFF00) !== 0);
+    this.setFlag(Flags.Z,(temp & 0x00FF) === 0);
+    this.setFlag(Flags.B,((temp ^ this.a) & (temp ^ value) & 0x80) !== 0);
+    this.setFlag(Flags.N,(temp & 0x0080) !== 0 );
+    this.a = temp & 0x00FF;
+
+    return 1;
+  }
   public STA(): number {}
   public TAY(): number {}
   public TYA(): number {}
