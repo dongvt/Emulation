@@ -1,4 +1,5 @@
 import { Opcode } from "./Opcode";
+import Bus from "../Bus";
 
 enum Flags {
   C = 1 << 0, //Carry Bit
@@ -10,13 +11,15 @@ enum Flags {
   V = 1 << 6, //Overflow
   N = 1 << 7, //Negative
 }
-class CPU {
+export default class CPU {
   private fetched = 0x00;
   private address_abs = 0x0000;
   private address_rel = 0x0000;
   private opcode = 0x00;
   private cycles = 0;
   private bus: Bus;
+
+  private temp = 0x0000;
 
   //Registers
   private a = 0x00;
@@ -91,9 +94,48 @@ class CPU {
     this.cycles = 8;
   }
   public irq(): void { //interrupt request signal
-    
-  } 
-  public nmi(): void {} //non maskable interrupt
+    if(this.getFlag(Flags.I)) {
+      this.write(0x0100 + this.sp, (this.pc >> 8) & 0xff);
+      this.sp--;
+      this.write(0x0100 + this.sp, this.pc & 0xff);
+      this.sp--;
+
+      this.setFlag(Flags.B, false);
+      this.setFlag(Flags.U, true);
+      this.setFlag(Flags.I, true);
+
+      this.write(0x0100 + this.sp, this.status);
+      this.sp--;
+
+      this.address_abs = 0xFFFE;
+      const low = this.read(this.address_abs + 0);
+      const high = this.read(this.address_abs + 1);
+
+      this.pc = (high << 8) | low;
+      this.cycles = 7;
+    }
+  }
+   
+  public nmi(): void {
+    this.write(0x0100 + this.sp, (this.pc >> 8) & 0xff);
+      this.sp--;
+      this.write(0x0100 + this.sp, this.pc & 0xff);
+      this.sp--;
+
+      this.setFlag(Flags.B, false);
+      this.setFlag(Flags.U, true);
+      this.setFlag(Flags.I, true);
+
+      this.write(0x0100 + this.sp, this.status);
+      this.sp--;
+
+      this.address_abs = 0xFFFA;
+      const low = this.read(this.address_abs + 0);
+      const high = this.read(this.address_abs + 1);
+
+      this.pc = (high << 8) | low;
+      this.cycles = 7;
+  } //non maskable interrupt
 
   public fetch(): number {
     if(this.lookup[this.opcode].addrmode !== this.IMP) {
@@ -230,15 +272,26 @@ class CPU {
       return 0;
   }
 
-  //opcodes (52)
+  /*******************************************************
+   * 
+   * 
+   * 
+   * 
+   *                    opcodes (52)
+   * 
+   * 
+   * 
+   * 
+   ******************************************************/
+  
   public ADC(): number {
     this.fetch();
-    const temp = this.a + this.fetched + this.getFlag(Flags.C);
-    this.setFlag(Flags.C,temp > 255);
-    this.setFlag(Flags.Z,(temp & 0x00FF) === 0);
-    this.setFlag(Flags.N, (temp & 0x80) !== 0);
-    this.setFlag(Flags.V,((~(this.a ^ this.fetched) & (this.a ^ temp)) & 0x0080) !== 0);
-    this.a = temp & 0x00FF;
+    this.temp = this.a + this.fetched + this.getFlag(Flags.C);
+    this.setFlag(Flags.C,this.temp > 255);
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N, (this.temp & 0x80) !== 0);
+    this.setFlag(Flags.V,((~(this.a ^ this.fetched) & (this.a ^ this.temp)) & 0x0080) !== 0);
+    this.a = this.temp & 0x00FF;
 
     return 1;
   }
@@ -282,7 +335,15 @@ class CPU {
     this.setFlag(Flags.V,false);
     return 0;
   }
-  public DEC(): number {}
+  public DEC(): number {
+    this.fetch();
+    this.temp = this.fetched - 1;
+    this.write(this.address_abs,this.temp & 0x00FF);
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+
+    return 0;
+  }
   public INC(): number {}
   public JSR(): number {}
   public LSR(): number {}
@@ -326,8 +387,21 @@ class CPU {
     this.setFlag(Flags.C,false);
     return 0;
   }
-  public CMP(): number {}
-  public DEX(): number {}
+  public CMP(): number {
+    this.fetch();
+    this.temp = this.a - this.fetched;
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+    this.setFlag(Flags.C,(this.a >= this.fetched));
+    return 1;
+  }
+  public DEX(): number {
+    this.x--;
+    this.setFlag(Flags.Z,this.x === 0x0000);
+    this.setFlag(Flags.N,(this.x & 0x0080) !== 0);
+    return 0;
+  
+  }
   public INX(): number {}
   public LDA(): number {}
   public NOP(): number {}
@@ -338,19 +412,84 @@ class CPU {
     this.setFlag(Flags.N,(this.a & 0x80) !== 0);
     return 0;
   }
-  public RTI(): number {}
+  public RTI(): number {
+    this.sp++;
+    this.status = this.read(0x0100 + this.sp);
+    this.status &= ~Flags.B;
+    this.status &= ~Flags.U;
+
+    this.sp++;
+    this.pc = this.read(0x0100 + this.sp);
+    this.sp++;
+    this.pc |= this.read(0x0100 + this.sp) << 8;
+
+    return 0;
+  }
   public SED(): number {}
   public STY(): number {}
   public TXA(): number {}
-  public ASL(): number {}
-  public BIT(): number {}
-  public BRK(): number {}
+  public ASL(): number {
+    this.fetch();
+    this.temp = this.fetched << 1;
+    this.setFlag(Flags.C,(this.fetched & 0xFF00) !== 0);
+    this.setFlag(Flags.Z,(this.temp && 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+
+    if(this.lookup[this.opcode].addrmode === this.IMP) {
+      this.a = this.temp & 0x00FF; 
+    } else {
+      this.write(this.address_abs,this.temp & 0x00FF);
+    }
+
+    return 0;
+  
+  }
+  public BIT(): number {
+    this.fetch();
+    this.temp = this.a & this.fetched;
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.fetched & (1 << 7)) !== 0);
+    this.setFlag(Flags.V,(this.fetched & (1 << 6)) !== 0);
+
+    return 0;
+  }
+  public BRK(): number {
+    this.pc++;
+
+    this.setFlag(Flags.I,true);
+
+    this.write(0x0100 + this.sp,(this.pc >> 8) & 0x00FF);
+    this.sp--;
+    this.write(0x0100 + this.sp,this.pc & 0x00FF);
+    this.sp--;
+
+    this.setFlag(Flags.B,true);
+    this.write(0x0100 + this.sp,this.status);
+    this.sp--;
+
+    this.pc = this.read(0xFFFE) | (this.read(0xFFFF) << 8);
+
+    return 0;
+  }
   public CLD(): number {
     this.setFlag(Flags.D,false);
     return 0;
   }
-  public CPX(): number {}
-  public DEY(): number {}
+  public CPX(): number {
+    this.fetch();
+    this.temp = this.x - this.fetched;
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+    this.setFlag(Flags.C,(this.x >= this.fetched));
+    return 1;
+  }
+  public DEY(): number {
+    this.y--;
+    this.setFlag(Flags.Z,this.y === 0x0000);
+    this.setFlag(Flags.N,(this.y & 0x0080) !== 0);
+    return 0;
+  
+  }
   public INY(): number {}
   public LDX(): number {}
   public ORA(): number {}
@@ -412,12 +551,12 @@ class CPU {
   public SBC(): number {
     this.fetch();
     const value = this.fetched ^ 0x00FF;
-    const temp = this.a + value + this.getFlag(Flags.C);
-    this.setFlag(Flags.C,(temp & 0xFF00) !== 0);
-    this.setFlag(Flags.Z,(temp & 0x00FF) === 0);
-    this.setFlag(Flags.B,((temp ^ this.a) & (temp ^ value) & 0x80) !== 0);
-    this.setFlag(Flags.N,(temp & 0x0080) !== 0 );
-    this.a = temp & 0x00FF;
+    this.temp = this.a + value + this.getFlag(Flags.C);
+    this.setFlag(Flags.C,(this.temp & 0xFF00) !== 0);
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.B,((this.temp ^ this.a) & (this.temp ^ value) & 0x80) !== 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0 );
+    this.a = this.temp & 0x00FF;
 
     return 1;
   }
