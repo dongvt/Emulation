@@ -344,14 +344,73 @@ export default class CPU {
 
     return 0;
   }
-  public INC(): number {}
-  public JSR(): number {}
-  public LSR(): number {}
-  public PHP(): number {}
-  public ROR(): number {}
-  public SEC(): number {}
-  public STX(): number {}
-  public TSX(): number {}
+  public INC(): number {
+    this.fetch();
+    this.temp = this.fetched + 1;
+    this.write(this.address_abs,this.temp & 0x00FF);
+    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+    return 0;
+  }
+  public JSR(): number {
+    this.pc--;
+    this.write(0x0100 + this.sp, (this.pc >> 8) & 0x00FF);
+    this.sp--;
+    this.write(0x0100 + this.sp, this.pc & 0x00FF);
+    this.sp--;
+
+    this.pc = this.address_abs;
+    return 0;
+  }
+  public LSR(): number {
+    this.fetch();
+    this.setFlag(Flags.C,(this.fetched & 0x01) !== 0);
+    this.temp = this.fetched >> 1;
+    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
+    if(this.lookup[this.opcode].addrmode === this.IMP) {
+      this.a = this.temp & 0xff;
+    } else {
+      this.write(this.address_abs,this.temp & 0xff);
+    }
+    return 0;
+  }
+  public PHP(): number {
+    this.write(0x0100 + this.sp, this.status | Flags.B | Flags.U);
+    this.sp--;
+    this.setFlag(Flags.B,false);
+    this.setFlag(Flags.U,false);
+    return 0;
+  }
+  public ROR(): number {
+    this.fetch();
+    this.temp = (this.getFlag(Flags.C) << 7)| (this.fetched >> 1);
+    this.setFlag(Flags.C,(this.fetched & 0x1) !== 0);
+    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
+
+    if(this.lookup[this.opcode].addrmode === this.IMP) {
+      this.a = this.temp & 0x00FF;
+    } else {
+      this.write(this.address_abs,this.temp & 0x00FF);
+    }
+    return 0;
+  }
+  public SEC(): number {
+    this.setFlag(Flags.C,true);
+    return 0;
+  }
+  public STX(): number {
+    this.write(this.address_abs,this.x);
+    return 0;
+  }
+  public TSX(): number {
+    this.x = this.sp;
+    this.setFlag(Flags.Z,this.x === 0x00);
+    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
+    return 0;
+  
+  }
   public AND(): number {
     this.fetch();
     this.a = this.a & this.fetched;
@@ -397,14 +456,28 @@ export default class CPU {
   }
   public DEX(): number {
     this.x--;
-    this.setFlag(Flags.Z,this.x === 0x0000);
-    this.setFlag(Flags.N,(this.x & 0x0080) !== 0);
+    this.setFlag(Flags.Z,this.x === 0x00);
+    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
     return 0;
   
   }
-  public INX(): number {}
-  public LDA(): number {}
-  public NOP(): number {}
+  public INX(): number {
+    this.x++;
+    this.setFlag(Flags.Z,this.x === 0x0000);
+    this.setFlag(Flags.N,(this.x & 0x0080) !== 0);
+    return 0;
+  }
+  public LDA(): number {
+    this.fetch();
+    this.a = this.fetched;
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0); 
+    return 1;
+  }
+  public NOP(): number {
+    //TODO: Implement NOP
+    return 0;
+  }
   public PLA(): number {
     this.sp++;
     this.a = this.read(0x0100 + this.sp);
@@ -425,9 +498,20 @@ export default class CPU {
 
     return 0;
   }
-  public SED(): number {}
-  public STY(): number {}
-  public TXA(): number {}
+  public SED(): number {
+    this.setFlag(Flags.D,true);
+    return 0;
+  }
+  public STY(): number {
+    this.write(this.address_abs,this.y);
+    return 0;
+  }
+  public TXA(): number {
+    this.a = this.x;
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
+    return 0;
+  }
   public ASL(): number {
     this.fetch();
     this.temp = this.fetched << 1;
@@ -442,7 +526,6 @@ export default class CPU {
     }
 
     return 0;
-  
   }
   public BIT(): number {
     this.fetch();
@@ -490,14 +573,56 @@ export default class CPU {
     return 0;
   
   }
-  public INY(): number {}
-  public LDX(): number {}
-  public ORA(): number {}
-  public PLP(): number {}
-  public RTS(): number {}
-  public SEI(): number {}
-  public TAX(): number {}
-  public TXS(): number {}
+  public INY(): number {
+    this.y++;
+    this.setFlag(Flags.Z,this.y === 0x0000);
+    this.setFlag(Flags.N,(this.y & 0x0080) !== 0);
+    return 0;
+  }
+  public LDX(): number {
+    this.fetch();
+    this.x = this.fetched;
+    this.setFlag(Flags.Z,this.x === 0x00);
+    this.setFlag(Flags.N,(this.x & 0x80) !== 0); 
+    return 1;
+  }
+  public ORA(): number {
+    this.fetch();
+    this.a = this.a | this.fetched;
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
+    return 1;
+  
+  }
+  public PLP(): number {
+    this.sp++;
+    this.status = this.read(0x0100 + this.sp);
+    this.setFlag(Flags.B,true);
+    return 0;
+  
+  }
+  public RTS(): number {
+    this.sp++;
+    this.pc = this.read(0x0100 + this.sp) | (this.read(0x0100 + this.sp + 1) << 8);
+    this.sp++;
+    return 0;
+  
+  }
+  public SEI(): number {
+    this.setFlag(Flags.I,true);
+    return 0;
+  }
+  public TAX(): number {
+    this.x = this.a;
+    this.setFlag(Flags.Z,this.x === 0x00);
+    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
+    return 0;
+  
+  }
+  public TXS(): number {
+    this.sp - this.x;
+    return 0;
+  }
   public BCC(): number {
     if(this.getFlag(Flags.C) === 0) {
       this.cycles++;
@@ -539,15 +664,43 @@ export default class CPU {
     return 0;
   }
   public CPY(): number {}
-  public EOR(): number {}
-  public JMP(): number {}
-  public LDY(): number {}
+  public EOR(): number {
+    this.fetch();
+    this.a = this.a ^ this.fetched;
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x0080) !== 0);
+
+    return 1;
+  }
+  public JMP(): number {
+    this.pc = this.address_abs;
+    return 0;
+  }
+  public LDY(): number {
+    this.fetch();
+    this.y = this.fetched;
+    this.setFlag(Flags.Z,this.y === 0x00);
+    this.setFlag(Flags.N,(this.y & 0x80) !== 0); 
+    return 1;
+  }
   public PHA(): number {
     this.write(0x0100 + this.sp,this.a);
     this.sp--;
     return 0;
   }
-  public ROL(): number {}
+  public ROL(): number {
+    this.fetch();
+    this.temp = (this.fetched << 1) | this.getFlag(Flags.C);
+    this.setFlag(Flags.C,(this.temp & 0xFF00) !== 0);
+    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
+    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
+    if(this.lookup[this.opcode].addrmode === this.IMP) {
+      this.a = this.temp & 0x00FF;
+    } else {
+      this.write(this.address_abs,this.temp & 0x00FF);
+    }
+    return 0;
+  }
   public SBC(): number {
     this.fetch();
     const value = this.fetched ^ 0x00FF;
@@ -560,10 +713,26 @@ export default class CPU {
 
     return 1;
   }
-  public STA(): number {}
-  public TAY(): number {}
-  public TYA(): number {}
+  public STA(): number {
+    this.write(this.address_abs,this.a);
+    return 0;
+  }
+  public TAY(): number {
+    this.y = this.a;
+    this.setFlag(Flags.Z,this.y === 0x00);
+    this.setFlag(Flags.N,(this.y & 0x80) !== 0);
+    return 0;
+  }
+  public TYA(): number {
+    this.a = this.y;
+    this.setFlag(Flags.Z,this.a === 0x00);
+    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
+    return 0;
+  
+  }
 
   //Un handled opcodes
-  public XXX(): number {}
+  public XXX(): number {
+    return 0;
+  }
 }

@@ -1,4 +1,6 @@
-class Bus {
+import CPU  from "./CPU/CPU";
+
+export default class Bus {
 
     private cpu : CPU;
     private ram : number[];
