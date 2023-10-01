@@ -1,3 +1,4 @@
+import CPU from "./CPU";
 interface opcodeStruct {
   name: string;
   operation: () => number;

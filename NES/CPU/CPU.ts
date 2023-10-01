@@ -52,11 +52,11 @@ export default class CPU {
   }
 
   public write(address: number, data: number): void {
-    this.bus.write(address, data);
+    this.bus.cpuWrite(address, data);
   }
 
   public read(address: number): number {
-    return this.bus.read(address);
+    return this.bus.cpuRead(address);
   }
 
   public clock(): void {
@@ -663,7 +663,15 @@ export default class CPU {
     this.setFlag(Flags.I,false);
     return 0;
   }
-  public CPY(): number {}
+  public CPY(): number {
+    this.fetch();
+    this.temp = this.y - this.fetched;
+    this.setFlag(Flags.C,(this.y >= this.fetched));
+    this.setFlag(Flags.Z,this.temp === 0x00);
+    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
+    return 1;
+  
+  }
   public EOR(): number {
     this.fetch();
     this.a = this.a ^ this.fetched;
