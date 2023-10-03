@@ -1,6 +1,14 @@
 import Bus from "./Bus";
 
 export class Cartridge {
+
+    private vPRGMemory : []; //Program Memory
+    private vCHRMemory : []; //Character Memory
+
+    private mapID : number;
+    private nPRGBanks : number;
+    private nCHRBanks : number;
+
     constructor(bus : Bus) {
     }
 

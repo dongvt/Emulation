@@ -5,8 +5,14 @@ import { Cartridge } from "./Cartridge";
 export default class PPU {
 
     private cartridge : Cartridge;
+
+    private tableName : number[][]; //2 kb
+    private tblPalette : number[]; 
+    private tblPatten : number[]; //Javix
     
     constructor(bus : Bus) {
+        this.tableName = new Array(2).fill([]).map(() => new Array(1024));
+        this.tblPalette = new Array(32);
     }
 
     public cpuRead(address: number) : number {
