@@ -1,746 +1,211 @@
-import { Opcode } from "./Opcode";
-import Bus from "../Bus";
+import { Instruction } from "./instructionTable";
+import * as modes from "./addressingModes";
 
-enum Flags {
-  C = 1 << 0, //Carry Bit
-  Z = 1 << 1, //Zero
-  I = 1 << 2, //Disable Interrupts
-  D = 1 << 3, //Decimal Mode
-  B = 1 << 4, //Break
-  U = 1 << 5, //Unused
-  V = 1 << 6, //Overflow
-  N = 1 << 7, //Negative
-}
-export default class CPU {
-  private fetched = 0x00;
-  private address_abs = 0x0000;
-  private address_rel = 0x0000;
-  private opcode = 0x00;
-  private cycles = 0;
-  private bus: Bus;
+export class CPU {
+  // 8-bit registers
+  A = 0x00; // Accumulator
+  X = 0x00; // X Register
+  Y = 0x00; // Y Register
 
-  private temp = 0x0000;
+  // Stack Pointer
+  SP = 0xfd; // Stack Pointer (initialized to 0xFD)
 
-  //Registers
-  private a = 0x00;
-  private x = 0x00;
-  private y = 0x00;
-  private sp = 0x0000;
-  private pc = 0x00;
-  private status = 0x00;
+  // Program Counter
+  PC = 0x0000;
 
-  private lookup: Opcode;
+  // Status Register
+  P = 0x24; // Status Register
+
+  // Memory 64KB
+  memory: Uint8Array = new Uint8Array(0x10000);
+
+  private instructions: Record<number, Instruction> = {};
 
   constructor() {
-    this.lookup = new Opcode(this);
+    this.initInstructions();
   }
 
-  private getFlag(f : number) : number {
-    return (this.status & 0xf) > 0 ? 1 : 0;
+  initInstructions() {
+    this.instructions = {
+      0x8d: {
+        name: "STA",
+        mode: "absolute",
+        bytes: 3,
+        cycles: 4,
+        execute: () => this.sta(modes.absoluteAddress(this)),
+      },
+      0xa0: {
+        name: "LDY",
+        mode: "immediate",
+        bytes: 2,
+        cycles: 2,
+        execute: () => this.ldy(modes.immediate(this)),
+      },
+      0xa2: {
+        name: "LDX",
+        mode: "immediate",
+        bytes: 2,
+        cycles: 2,
+        execute: () => this.ldx(modes.immediate(this)),
+      },
+      0xa4: {
+        name: "LDY",
+        mode: "zeroPage",
+        bytes: 2,
+        cycles: 3,
+        execute: () => this.ldy(modes.zeroPage(this)),
+      },
+      0xa5: {
+        name: "LDA",
+        mode: "zeroPage",
+        bytes: 2,
+        cycles: 3,
+        execute: () => this.lda(modes.zeroPage(this)),
+      },
+      0xa6: {
+        name: "LDX",
+        mode: "zeroPage",
+        bytes: 2,
+        cycles: 3,
+        execute: () => this.ldx(modes.zeroPage(this)),
+      },
+      0xa9: {
+        name: "LDA",
+        mode: "immediate",
+        bytes: 2,
+        cycles: 2,
+        execute: () => this.lda(modes.immediate(this)),
+      },
+      0xaa: {
+        name: "TAX",
+        mode: "implied",
+        bytes: 1,
+        cycles: 2,
+        execute: () => this.tax(),
+      },
+      0xac: {
+        name: "LDY",
+        mode: "absolute",
+        bytes: 3,
+        cycles: 4,
+        execute: () => this.ldy(modes.absolute(this)),
+      },
+      0xad: {
+        name: "LDA",
+        mode: "absolute",
+        bytes: 3,
+        cycles: 4,
+        execute: () => this.lda(modes.absolute(this)),
+      },
+      0xb4: {
+        name: "LDY",
+        mode: "zeroPage,X",
+        bytes: 2,
+        cycles: 4,
+        execute: () => this.ldy(modes.zeroPageX(this)),
+      },
+      0xb5: {
+        name: "LDA",
+        mode: "zeroPage,X",
+        bytes: 2,
+        cycles: 4,
+        execute: () => this.lda(modes.zeroPageX(this)),
+      },
+      0xb6: {
+        name: "LDX",
+        mode: "zeroPage,Y",
+        bytes: 2,
+        cycles: 4,
+        execute: () => this.ldx(modes.zeroPageY(this)),
+      },
+      0xb9: {
+        name: "LDA",
+        mode: "absolute,Y",
+        bytes: 3,
+        cycles: 4, // +1 if page boundary crossed
+        execute: () => this.lda(modes.absoluteY(this)),
+      },
+      0xbc: {
+        name: "LDY",
+        mode: "absolute,X",
+        bytes: 3,
+        cycles: 4, // +1 if page boundary crossed
+        execute: () => this.ldy(modes.absoluteX(this)),
+      },
+      0xbe: {
+        name: "LDX",
+        mode: "absolute",
+        bytes: 3,
+        cycles: 4,
+        execute: () => this.ldx(modes.absolute(this)),
+      },
+    };
   }
 
-  private setFlag(f : Flags, value : boolean) {
-    if(value) {
-      this.status |= f;
+  reset() {
+    const lo = this.memory[0xfffc];
+    const hi = this.memory[0xfffd];
+    this.PC = (hi << 8) | lo;
+  }
+
+  step(): void {
+    const opcode = this.fetchByte();
+    this.execute(opcode);
+  }
+
+  fetchByte(): number {
+    const byte = this.memory[this.PC];
+    this.PC++;
+    return byte;
+  }
+
+  execute(opcode: number): void {
+    const instruction = this.instructions[opcode];
+
+    if (!instruction) {
+        console.log(this.instructions)
+      throw new Error(`Unknown opcode: ${opcode.toString(16)}`);
+    }
+
+    instruction.execute();
+  }
+
+  lda(value: number): void {
+    this.A = value;
+    this.updateZeroAndNegativeFlags(this.A);
+  }
+
+  ldx(value: number): void {
+    this.X = value;
+    this.updateZeroAndNegativeFlags(this.X);
+  }
+
+  ldy(value: number): void {
+    this.Y = value;
+    this.updateZeroAndNegativeFlags(this.Y);
+  }
+
+  tax(): void {
+    this.X = this.A;
+    this.updateZeroAndNegativeFlags(this.X);
+  }
+
+  sta(address: number): void {
+    this.memory[address] = this.A;
+  }
+
+  
+
+  updateZeroAndNegativeFlags(value: number): void {
+    this.setFlag(2, value === 0); // Zero Flag
+    this.setFlag(7, (value & 0x80) !== 0); // Negative Flag
+  }
+
+  setFlag(flag: number, condition: boolean): void {
+    if (condition) {
+      this.P |= 1 << flag;
     } else {
-      this.status &= ~f;
+      this.P &= ~(1 << flag);
     }
-  }
-
-  public ConnectBus(n: Bus) {
-    this.bus = n;
-  }
-
-  public write(address: number, data: number): void {
-    this.bus.cpuWrite(address, data);
-  }
-
-  public read(address: number): number {
-    return this.bus.cpuRead(address);
-  }
-
-  public clock(): void {
-    if (this.cycles === 0) {
-      this.opcode = this.read(this.pc);
-      this.pc++;
-
-      this.cycles = this.lookup[this.opcode].cycles;
-
-      const additionalCycle1 = this.lookup[this.opcode].addrmode();
-
-      const additionalCycle2 = this.lookup[this.opcode].operation();
-
-      this.cycles += additionalCycle1 + additionalCycle2;
-    }
-
-    this.cycles--;
-  }
-  public reset(): void {
-    this.a = 0;
-    this.x = 0;
-    this.y = 0;
-    this.sp = 0xFD;
-    this.status = 0x00 | Flags.U;
-
-    this.address_abs = 0xFFFC;
-    const low = this.read(this.address_abs + 0);
-    const high = this.read(this.address_abs + 1);
-
-    this.pc = (high << 8) | low;
-    this.address_rel = 0x0000;
-    this.address_abs = 0x0000;
-    this.fetched = 0x00;
-
-    this.cycles = 8;
-  }
-  public irq(): void { //interrupt request signal
-    if(this.getFlag(Flags.I)) {
-      this.write(0x0100 + this.sp, (this.pc >> 8) & 0xff);
-      this.sp--;
-      this.write(0x0100 + this.sp, this.pc & 0xff);
-      this.sp--;
-
-      this.setFlag(Flags.B, false);
-      this.setFlag(Flags.U, true);
-      this.setFlag(Flags.I, true);
-
-      this.write(0x0100 + this.sp, this.status);
-      this.sp--;
-
-      this.address_abs = 0xFFFE;
-      const low = this.read(this.address_abs + 0);
-      const high = this.read(this.address_abs + 1);
-
-      this.pc = (high << 8) | low;
-      this.cycles = 7;
-    }
-  }
-   
-  public nmi(): void {
-    this.write(0x0100 + this.sp, (this.pc >> 8) & 0xff);
-      this.sp--;
-      this.write(0x0100 + this.sp, this.pc & 0xff);
-      this.sp--;
-
-      this.setFlag(Flags.B, false);
-      this.setFlag(Flags.U, true);
-      this.setFlag(Flags.I, true);
-
-      this.write(0x0100 + this.sp, this.status);
-      this.sp--;
-
-      this.address_abs = 0xFFFA;
-      const low = this.read(this.address_abs + 0);
-      const high = this.read(this.address_abs + 1);
-
-      this.pc = (high << 8) | low;
-      this.cycles = 7;
-  } //non maskable interrupt
-
-  public fetch(): number {
-    if(this.lookup[this.opcode].addrmode !== this.IMP) {
-      this.fetched = this.read(this.address_abs);
-    }
-    return this.fetched;
-  }
-
-  //Addressing modes (12)
-  public IMP(): number {
-    this.fetched = this.a;
-    return 0;
-  }
-
-  public IMM(): number {
-    this.address_abs = this.pc++;
-    return 0;
-  }
-
-  public ZP0(): number {
-    this.address_abs = this.read(this.pc++);
-    this.address_abs &= 0x0ff;
-    return 0;
-  }
-
-  public ZPY(): number {
-    this.address_abs = this.read(this.pc) + this.y;
-    this.pc++;
-    this.address_abs &= 0x0ff;
-    return 0;
-  }
-
-  public ZPX(): number {
-    this.address_abs = this.read(this.pc) + this.x;
-    this.pc++;
-    this.address_abs &= 0x0ff;
-    return 0;
-  }
-
-  public ABS(): number {
-    const low = this.read(this.pc);
-    this.pc++;
-    const high = this.read(this.pc);
-    this.pc++;
-
-    this.address_abs = (high << 8) | low;
-
-    return 0;
-  }
-
-  public ABX(): number {
-    const low = this.read(this.pc);
-    this.pc++;
-    const high = this.read(this.pc);
-    this.pc++;
-
-    this.address_abs = (high << 8) | low;
-    this.address_abs += this.x;
-
-    if ((this.address_abs & 0xff00) !== high << 8) {
-      return 1;
-    } else {
-      return 0;
-    }
-  }
-
-  public ABY(): number {
-    const low = this.read(this.pc);
-    this.pc++;
-    const high = this.read(this.pc);
-    this.pc++;
-
-    this.address_abs = (high << 8) | low;
-    this.address_abs += this.y;
-
-    if ((this.address_abs & 0xff00) !== high << 8) {
-      return 1;
-    } else {
-      return 0;
-    }
-  }
-
-  public IND(): number {
-    const low = this.read(this.pc);
-    this.pc++;
-    const high = this.read(this.pc);
-    this.pc++;
-
-    const completeAddr = (high << 8) | low;
-
-    if (low == 0x00ff) {
-      this.address_abs =
-        (this.read(completeAddr & 0x00ff) << 8) | this.read(completeAddr + 0);
-    } else {
-      this.address_abs =
-        (this.read(completeAddr + 1) << 8) | this.read(completeAddr + 0);
-    }
-
-    return 0;
-  }
-
-  public IZX(): number {
-    const t = this.read(this.pc);
-    const low = this.read((t + this.x) & 0x00ff);
-    const high = this.read((t + this.x + 1) & 0x00ff);
-
-    this.address_abs = (high << 8) | low;
-
-    return 0;
-  }
-
-  public IZY(): number {
-    const t = this.read(this.pc);
-    this.pc++;
-    const low = this.read(t & 0x00ff);
-    const high = this.read((t + 1) & 0x00ff);
-
-    this.address_abs = (high << 8) | low;
-    this.address_abs += this.y;
-
-    if ((this.address_abs & 0x00ff) !== high << 8) {
-      return 1;
-    } else {
-      return 0;
-    }
-  }
-
-  public REL(): number {
-    this.address_rel = this.read(this.pc);
-    this.pc++;
-    if(this.address_rel & 0x80)
-      this.address_rel |= 0xFF00;
-
-      return 0;
-  }
-
-  /*******************************************************
-   * 
-   * 
-   * 
-   * 
-   *                    opcodes (52)
-   * 
-   * 
-   * 
-   * 
-   ******************************************************/
-  
-  public ADC(): number {
-    this.fetch();
-    this.temp = this.a + this.fetched + this.getFlag(Flags.C);
-    this.setFlag(Flags.C,this.temp > 255);
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N, (this.temp & 0x80) !== 0);
-    this.setFlag(Flags.V,((~(this.a ^ this.fetched) & (this.a ^ this.temp)) & 0x0080) !== 0);
-    this.a = this.temp & 0x00FF;
-
-    return 1;
-  }
-  public BCS(): number {
-    if(this.getFlag(Flags.C) === 1) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public BNE(): number {
-    if(this.getFlag(Flags.Z) === 0) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public BVS(): number {
-    if(this.getFlag(Flags.V) === 1) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public CLV(): number {
-    this.setFlag(Flags.V,false);
-    return 0;
-  }
-  public DEC(): number {
-    this.fetch();
-    this.temp = this.fetched - 1;
-    this.write(this.address_abs,this.temp & 0x00FF);
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-
-    return 0;
-  }
-  public INC(): number {
-    this.fetch();
-    this.temp = this.fetched + 1;
-    this.write(this.address_abs,this.temp & 0x00FF);
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-    return 0;
-  }
-  public JSR(): number {
-    this.pc--;
-    this.write(0x0100 + this.sp, (this.pc >> 8) & 0x00FF);
-    this.sp--;
-    this.write(0x0100 + this.sp, this.pc & 0x00FF);
-    this.sp--;
-
-    this.pc = this.address_abs;
-    return 0;
-  }
-  public LSR(): number {
-    this.fetch();
-    this.setFlag(Flags.C,(this.fetched & 0x01) !== 0);
-    this.temp = this.fetched >> 1;
-    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
-    if(this.lookup[this.opcode].addrmode === this.IMP) {
-      this.a = this.temp & 0xff;
-    } else {
-      this.write(this.address_abs,this.temp & 0xff);
-    }
-    return 0;
-  }
-  public PHP(): number {
-    this.write(0x0100 + this.sp, this.status | Flags.B | Flags.U);
-    this.sp--;
-    this.setFlag(Flags.B,false);
-    this.setFlag(Flags.U,false);
-    return 0;
-  }
-  public ROR(): number {
-    this.fetch();
-    this.temp = (this.getFlag(Flags.C) << 7)| (this.fetched >> 1);
-    this.setFlag(Flags.C,(this.fetched & 0x1) !== 0);
-    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
-
-    if(this.lookup[this.opcode].addrmode === this.IMP) {
-      this.a = this.temp & 0x00FF;
-    } else {
-      this.write(this.address_abs,this.temp & 0x00FF);
-    }
-    return 0;
-  }
-  public SEC(): number {
-    this.setFlag(Flags.C,true);
-    return 0;
-  }
-  public STX(): number {
-    this.write(this.address_abs,this.x);
-    return 0;
-  }
-  public TSX(): number {
-    this.x = this.sp;
-    this.setFlag(Flags.Z,this.x === 0x00);
-    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
-    return 0;
-  
-  }
-  public AND(): number {
-    this.fetch();
-    this.a = this.a & this.fetched;
-    this.setFlag(Flags.Z, this.a == 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
-    return 1;
-  }
-  public BEQ(): number {
-    if(this.getFlag(Flags.Z) === 1) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public BPL(): number {
-    if(this.getFlag(Flags.N) === 0) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public CLC(): number {
-    this.setFlag(Flags.C,false);
-    return 0;
-  }
-  public CMP(): number {
-    this.fetch();
-    this.temp = this.a - this.fetched;
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-    this.setFlag(Flags.C,(this.a >= this.fetched));
-    return 1;
-  }
-  public DEX(): number {
-    this.x--;
-    this.setFlag(Flags.Z,this.x === 0x00);
-    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
-    return 0;
-  
-  }
-  public INX(): number {
-    this.x++;
-    this.setFlag(Flags.Z,this.x === 0x0000);
-    this.setFlag(Flags.N,(this.x & 0x0080) !== 0);
-    return 0;
-  }
-  public LDA(): number {
-    this.fetch();
-    this.a = this.fetched;
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0); 
-    return 1;
-  }
-  public NOP(): number {
-    //TODO: Implement NOP
-    return 0;
-  }
-  public PLA(): number {
-    this.sp++;
-    this.a = this.read(0x0100 + this.sp);
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
-    return 0;
-  }
-  public RTI(): number {
-    this.sp++;
-    this.status = this.read(0x0100 + this.sp);
-    this.status &= ~Flags.B;
-    this.status &= ~Flags.U;
-
-    this.sp++;
-    this.pc = this.read(0x0100 + this.sp);
-    this.sp++;
-    this.pc |= this.read(0x0100 + this.sp) << 8;
-
-    return 0;
-  }
-  public SED(): number {
-    this.setFlag(Flags.D,true);
-    return 0;
-  }
-  public STY(): number {
-    this.write(this.address_abs,this.y);
-    return 0;
-  }
-  public TXA(): number {
-    this.a = this.x;
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
-    return 0;
-  }
-  public ASL(): number {
-    this.fetch();
-    this.temp = this.fetched << 1;
-    this.setFlag(Flags.C,(this.fetched & 0xFF00) !== 0);
-    this.setFlag(Flags.Z,(this.temp && 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-
-    if(this.lookup[this.opcode].addrmode === this.IMP) {
-      this.a = this.temp & 0x00FF; 
-    } else {
-      this.write(this.address_abs,this.temp & 0x00FF);
-    }
-
-    return 0;
-  }
-  public BIT(): number {
-    this.fetch();
-    this.temp = this.a & this.fetched;
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.fetched & (1 << 7)) !== 0);
-    this.setFlag(Flags.V,(this.fetched & (1 << 6)) !== 0);
-
-    return 0;
-  }
-  public BRK(): number {
-    this.pc++;
-
-    this.setFlag(Flags.I,true);
-
-    this.write(0x0100 + this.sp,(this.pc >> 8) & 0x00FF);
-    this.sp--;
-    this.write(0x0100 + this.sp,this.pc & 0x00FF);
-    this.sp--;
-
-    this.setFlag(Flags.B,true);
-    this.write(0x0100 + this.sp,this.status);
-    this.sp--;
-
-    this.pc = this.read(0xFFFE) | (this.read(0xFFFF) << 8);
-
-    return 0;
-  }
-  public CLD(): number {
-    this.setFlag(Flags.D,false);
-    return 0;
-  }
-  public CPX(): number {
-    this.fetch();
-    this.temp = this.x - this.fetched;
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-    this.setFlag(Flags.C,(this.x >= this.fetched));
-    return 1;
-  }
-  public DEY(): number {
-    this.y--;
-    this.setFlag(Flags.Z,this.y === 0x0000);
-    this.setFlag(Flags.N,(this.y & 0x0080) !== 0);
-    return 0;
-  
-  }
-  public INY(): number {
-    this.y++;
-    this.setFlag(Flags.Z,this.y === 0x0000);
-    this.setFlag(Flags.N,(this.y & 0x0080) !== 0);
-    return 0;
-  }
-  public LDX(): number {
-    this.fetch();
-    this.x = this.fetched;
-    this.setFlag(Flags.Z,this.x === 0x00);
-    this.setFlag(Flags.N,(this.x & 0x80) !== 0); 
-    return 1;
-  }
-  public ORA(): number {
-    this.fetch();
-    this.a = this.a | this.fetched;
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
-    return 1;
-  
-  }
-  public PLP(): number {
-    this.sp++;
-    this.status = this.read(0x0100 + this.sp);
-    this.setFlag(Flags.B,true);
-    return 0;
-  
-  }
-  public RTS(): number {
-    this.sp++;
-    this.pc = this.read(0x0100 + this.sp) | (this.read(0x0100 + this.sp + 1) << 8);
-    this.sp++;
-    return 0;
-  
-  }
-  public SEI(): number {
-    this.setFlag(Flags.I,true);
-    return 0;
-  }
-  public TAX(): number {
-    this.x = this.a;
-    this.setFlag(Flags.Z,this.x === 0x00);
-    this.setFlag(Flags.N,(this.x & 0x80) !== 0);
-    return 0;
-  
-  }
-  public TXS(): number {
-    this.sp - this.x;
-    return 0;
-  }
-  public BCC(): number {
-    if(this.getFlag(Flags.C) === 0) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public BMI(): number {
-    if(this.getFlag(Flags.N) === 1) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public BVC(): number {
-    if(this.getFlag(Flags.V) === 0) {
-      this.cycles++;
-      this.address_abs = this.pc + this.address_rel;
-      if((this.address_abs & 0xff00) !== (this.pc & 0x00ff)){
-        this.cycles++;
-      }
-      this.pc = this.address_abs;
-    }
-
-    return 0;
-  }
-  public CLI(): number {
-    this.setFlag(Flags.I,false);
-    return 0;
-  }
-  public CPY(): number {
-    this.fetch();
-    this.temp = this.y - this.fetched;
-    this.setFlag(Flags.C,(this.y >= this.fetched));
-    this.setFlag(Flags.Z,this.temp === 0x00);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0);
-    return 1;
-  
-  }
-  public EOR(): number {
-    this.fetch();
-    this.a = this.a ^ this.fetched;
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x0080) !== 0);
-
-    return 1;
-  }
-  public JMP(): number {
-    this.pc = this.address_abs;
-    return 0;
-  }
-  public LDY(): number {
-    this.fetch();
-    this.y = this.fetched;
-    this.setFlag(Flags.Z,this.y === 0x00);
-    this.setFlag(Flags.N,(this.y & 0x80) !== 0); 
-    return 1;
-  }
-  public PHA(): number {
-    this.write(0x0100 + this.sp,this.a);
-    this.sp--;
-    return 0;
-  }
-  public ROL(): number {
-    this.fetch();
-    this.temp = (this.fetched << 1) | this.getFlag(Flags.C);
-    this.setFlag(Flags.C,(this.temp & 0xFF00) !== 0);
-    this.setFlag(Flags.Z,(this.temp & 0xFF) === 0);
-    this.setFlag(Flags.N,(this.temp & 0x80) !== 0);
-    if(this.lookup[this.opcode].addrmode === this.IMP) {
-      this.a = this.temp & 0x00FF;
-    } else {
-      this.write(this.address_abs,this.temp & 0x00FF);
-    }
-    return 0;
-  }
-  public SBC(): number {
-    this.fetch();
-    const value = this.fetched ^ 0x00FF;
-    this.temp = this.a + value + this.getFlag(Flags.C);
-    this.setFlag(Flags.C,(this.temp & 0xFF00) !== 0);
-    this.setFlag(Flags.Z,(this.temp & 0x00FF) === 0);
-    this.setFlag(Flags.B,((this.temp ^ this.a) & (this.temp ^ value) & 0x80) !== 0);
-    this.setFlag(Flags.N,(this.temp & 0x0080) !== 0 );
-    this.a = this.temp & 0x00FF;
-
-    return 1;
-  }
-  public STA(): number {
-    this.write(this.address_abs,this.a);
-    return 0;
-  }
-  public TAY(): number {
-    this.y = this.a;
-    this.setFlag(Flags.Z,this.y === 0x00);
-    this.setFlag(Flags.N,(this.y & 0x80) !== 0);
-    return 0;
-  }
-  public TYA(): number {
-    this.a = this.y;
-    this.setFlag(Flags.Z,this.a === 0x00);
-    this.setFlag(Flags.N,(this.a & 0x80) !== 0);
-    return 0;
-  
-  }
-
-  //Un handled opcodes
-  public XXX(): number {
-    return 0;
   }
 }
